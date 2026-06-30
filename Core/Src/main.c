@@ -22,6 +22,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
+#include "bme280.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -59,6 +60,10 @@ static void MX_USART2_UART_Init(void);
 #else
 #define PUTCHAR_PROTOTYPE int fputc(int ch, FILE *f)
 #endif
+
+int8_t user_i2c_read(uint8_t reg_addr, uint8_t *reg_data, uint32_t len, void *intf_ptr);
+int8_t user_i2c_write(uint8_t reg_addr, const uint8_t *reg_data, uint32_t len, void *intf_ptr);
+void user_delay_us(uint32_t period, void *intf_ptr);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -98,7 +103,25 @@ int main(void)
   MX_I2C1_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
+  struct bme280_dev dev;
+    uint8_t dev_addr = 0x76; // A BME280 alapértelmezett I2C címe (vagy 0x77, ha a SDO láb magas)
+    int8_t rslt = BME280_OK;
 
+    // Beállítjuk az interfész paramétereit
+    dev.intf_ptr = &dev_addr;
+    dev.intf = BME280_I2C_INTF;
+    dev.read = user_i2c_read;
+    dev.write = user_i2c_write;
+    dev.delay_us = user_delay_us;
+
+    // Inicializáljuk a drivert
+    rslt = bme280_init(&dev);
+
+    if (rslt == BME280_OK) {
+        printf("BME280 sikeresen inicializalva!\r\n");
+    } else {
+        printf("Hiba: BME280 nem talalhato! Hibakod: %d\r\n", rslt);
+    }
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -106,8 +129,8 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-	  printf("Hello az STM32-rol! A rendszer mukodik.\r\n");
-	      HAL_Delay(1000); // 1 másodperces villogás/várakozás
+	  printf("Hallo von STM32! Das System funktioniert.\r\n");
+	      HAL_Delay(1000); // 1 Second Wartezeit
 	      /* USER CODE END WHILE */
     /* USER CODE BEGIN 3 */
   }
@@ -272,6 +295,49 @@ PUTCHAR_PROTOTYPE
 {
   HAL_UART_Transmit(&huart2, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
   return ch;
+}
+
+/* Bosch BME280 I2C Olvasó híd */
+int8_t user_i2c_read(uint8_t reg_addr, uint8_t *reg_data, uint32_t len, void *intf_ptr)
+{
+    // Az intf_ptr hordozza az I2C periféria címét (pl. &hi2c1)
+    HAL_StatusTypeDef status;
+    uint8_t dev_addr = *(uint8_t*)intf_ptr;
+
+    status = HAL_I2C_Mem_Read(&hi2c1, dev_addr << 1, reg_addr, I2C_MEMADD_SIZE_8BIT, reg_data, len, HAL_MAX_DELAY);
+
+    if (status == HAL_OK) {
+        return BME280_OK;
+    } else {
+        return BME280_E_COMM_FAIL;
+    }
+}
+
+/* Bosch BME280 I2C Író híd */
+int8_t user_i2c_write(uint8_t reg_addr, const uint8_t *reg_data, uint32_t len, void *intf_ptr)
+{
+    HAL_StatusTypeDef status;
+    uint8_t dev_addr = *(uint8_t*)intf_ptr;
+
+    status = HAL_I2C_Mem_Write(&hi2c1, dev_addr << 1, reg_addr, I2C_MEMADD_SIZE_8BIT, (uint8_t *)reg_data, len, HAL_MAX_DELAY);
+
+    if (status == HAL_OK) {
+        return BME280_OK;
+    } else {
+        return BME280_E_COMM_FAIL;
+    }
+}
+
+/* Bosch BME280 Késleltetés híd (milliszekundumban) */
+void user_delay_us(uint32_t period, void *intf_ptr)
+{
+    // A Bosch mikroszekundumban kéri, de a HAL_Delay milliszekundumos.
+    // Átváltjuk: 1 ms = 1000 us. Ha a periódus kisebb mint 1000, akkor is várunk legalább 1 ms-ot.
+    uint32_t ms = period / 1000;
+    if (ms == 0 && period > 0) {
+        ms = 1;
+    }
+    HAL_Delay(ms);
 }
 /* USER CODE END 4 */
 

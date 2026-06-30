@@ -23,6 +23,9 @@
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
 #include "bme280.h"
+#include "bme280_defs.h"
+#include "ssd1306.h"
+#include "ssd1306_fonts.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -102,26 +105,48 @@ int main(void)
   MX_GPIO_Init();
   MX_I2C1_Init();
   MX_USART2_UART_Init();
+
   /* USER CODE BEGIN 2 */
+
   struct bme280_dev dev;
-    uint8_t dev_addr = 0x76; // A BME280 alapértelmezett I2C címe (vagy 0x77, ha a SDO láb magas)
+    struct bme280_settings settings; // Létrehozzuk a beállítások struktúrát
+    uint8_t dev_addr = 0x76;
     int8_t rslt = BME280_OK;
 
-    // Beállítjuk az interfész paramétereit
     dev.intf_ptr = &dev_addr;
     dev.intf = BME280_I2C_INTF;
     dev.read = user_i2c_read;
     dev.write = user_i2c_write;
     dev.delay_us = user_delay_us;
 
-    // Inicializáljuk a drivert
     rslt = bme280_init(&dev);
 
     if (rslt == BME280_OK) {
         printf("BME280 sikeresen inicializalva!\r\n");
+
+        // 1. Előbb lekérjük a jelenlegi beállításokat
+        bme280_get_sensor_settings(&settings, &dev);
+
+        // 2. Módosítjuk a beállításokat
+        settings.osr_h = BME280_OVERSAMPLING_1X;
+        settings.osr_p = BME280_OVERSAMPLING_1X;
+        settings.osr_t = BME280_OVERSAMPLING_1X;
+        settings.filter = BME280_FILTER_COEFF_16;
+
+        // 3. Visszaírjuk a beállításokat a szenzorba
+        bme280_set_sensor_settings(BME280_SEL_ALL_SETTINGS, &settings, &dev);
+
+        // 4. Mód beállítása
+        bme280_set_sensor_mode(BME280_POWERMODE_NORMAL, &dev); // Figyeld: POWERMODE_NORMAL
     } else {
-        printf("Hiba: BME280 nem talalhato! Hibakod: %d\r\n", rslt);
+        printf("Hiba: BME280 inicializalas sikertelen! Hibakod: %d\r\n", rslt);
     }
+
+    ssd1306_Init(); // Ez küldi ki az inicializációs parancsokat az OLED-nek
+    ssd1306_Fill(Black); // Töröld a képernyőt
+    ssd1306_UpdateScreen(); // Ezzel küldöd ki a buffer tartalmát a kijelzőre
+
+	  printf("Hallo von STM32! Das System funktioniert.\r\n");
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -129,8 +154,31 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-	  printf("Hallo von STM32! Das System funktioniert.\r\n");
-	      HAL_Delay(1000); // 1 Second Wartezeit
+	  struct bme280_data comp_data;
+
+	      // Mérés lekérése
+	      bme280_get_sensor_data(BME280_ALL, &comp_data, &dev);
+
+	      // Kiírás a terminálra
+	      printf("Homerseklet: %.2f C | Paratartalom: %.2f %% | Nyomas: %.2f hPa\r\n",
+	             comp_data.temperature,
+	             comp_data.humidity,
+	             comp_data.pressure / 100.0);
+
+	      HAL_Delay(1000); // 1 másodperces várakozás
+
+	      // 1. Töröld a puffert (hogy ne maradjon ott a régi adat)
+	          ssd1306_Fill(Black);
+
+	          // 2. Írd ki a hőmérsékletet
+	          ssd1306_SetCursor(0, 0); // Bal felső sarok
+	          ssd1306_WriteString("Temp: 28.2 C", Font_7x10, White);
+
+	          // 3. Küldd ki a kijelzőre
+	          ssd1306_UpdateScreen();
+
+	          HAL_Delay(1000); // Várj egy másodpercet a frissítés előtt
+	          /* USER CODE END WHILE */
 	      /* USER CODE END WHILE */
     /* USER CODE BEGIN 3 */
   }

@@ -167,17 +167,30 @@ int main(void)
 
 	      HAL_Delay(1000); // 1 másodperces várakozás
 
-	      // 1. Töröld a puffert (hogy ne maradjon ott a régi adat)
-	          ssd1306_Fill(Black);
+	      // 1. Töröld a puffert
+	      ssd1306_Fill(Black);
 
-	          // 2. Írd ki a hőmérsékletet
-	          ssd1306_SetCursor(0, 0); // Bal felső sarok
-	          ssd1306_WriteString("Temp: 28.2 C", Font_7x10, White);
+	      // 2. Készítsd elő a szövegeket (külön változókba vagy soronként)
+	      char buffer1[20];
+	      char buffer2[20];
+	      char buffer3[20];
 
-	          // 3. Küldd ki a kijelzőre
-	          ssd1306_UpdateScreen();
+	      sprintf(buffer1, "Temp: %.2f C", comp_data.temperature);
+	      sprintf(buffer2, "Hum: %.2f %%", comp_data.humidity);
+	      sprintf(buffer3, "Pres: %.2f hPa", comp_data.pressure / 100.0);
 
-	          HAL_Delay(1000); // Várj egy másodpercet a frissítés előtt
+	      // 3. Írd ki őket különböző sorokba
+	      ssd1306_SetCursor(0, 0);  // 1. sor (y = 0)
+	      ssd1306_WriteString(buffer1, Font_7x10, White);
+
+	      ssd1306_SetCursor(0, 15); // 2. sor (y = 15, mert a Font_7x10 magassága 10-12 pixel)
+	      ssd1306_WriteString(buffer2, Font_7x10, White);
+
+	      ssd1306_SetCursor(0, 30); // 3. sor (y = 30)
+	      ssd1306_WriteString(buffer3, Font_7x10, White);
+
+	      // 4. Frissíts!
+	      ssd1306_UpdateScreen();
 	          /* USER CODE END WHILE */
 	      /* USER CODE END WHILE */
     /* USER CODE BEGIN 3 */

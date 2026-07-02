@@ -109,7 +109,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   struct bme280_dev dev;
-    struct bme280_settings settings; // Létrehozzuk a beállítások struktúrát
+    struct bme280_settings settings; // First we're making the configuration structure
     uint8_t dev_addr = 0x76;
     int8_t rslt = BME280_OK;
 
@@ -122,31 +122,31 @@ int main(void)
     rslt = bme280_init(&dev);
 
     if (rslt == BME280_OK) {
-        printf("BME280 sikeresen inicializalva!\r\n");
+        printf("BME280 was found!\r\n");
 
-        // 1. Előbb lekérjük a jelenlegi beállításokat
+        // 1. Get current sensor Settings
         bme280_get_sensor_settings(&settings, &dev);
 
-        // 2. Módosítjuk a beállításokat
+        // 2. Modification of Settings
         settings.osr_h = BME280_OVERSAMPLING_1X;
         settings.osr_p = BME280_OVERSAMPLING_1X;
         settings.osr_t = BME280_OVERSAMPLING_1X;
         settings.filter = BME280_FILTER_COEFF_16;
 
-        // 3. Visszaírjuk a beállításokat a szenzorba
+        // 3. We're writing the modification back to the sensor
         bme280_set_sensor_settings(BME280_SEL_ALL_SETTINGS, &settings, &dev);
 
-        // 4. Mód beállítása
-        bme280_set_sensor_mode(BME280_POWERMODE_NORMAL, &dev); // Figyeld: POWERMODE_NORMAL
+        // 4. Set sensor mode
+        bme280_set_sensor_mode(BME280_POWERMODE_NORMAL, &dev); // Attend to: POWERMODE_NORMAL
     } else {
-        printf("Hiba: BME280 inicializalas sikertelen! Hibakod: %d\r\n", rslt);
+        printf("Hiba: BME280 was not found! error code: %d\r\n", rslt);
     }
 
-    ssd1306_Init(); // Ez küldi ki az inicializációs parancsokat az OLED-nek
-    ssd1306_Fill(Black); // Töröld a képernyőt
-    ssd1306_UpdateScreen(); // Ezzel küldöd ki a buffer tartalmát a kijelzőre
+    ssd1306_Init();
+    ssd1306_Fill(Black);
+    ssd1306_UpdateScreen();
 
-	  printf("Hallo von STM32! Das System funktioniert.\r\n");
+	  printf("Hello from STM32! The system is active!\r\n");
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -156,21 +156,19 @@ int main(void)
     /* USER CODE END WHILE */
 	  struct bme280_data comp_data;
 
-	      // Mérés lekérése
+	      // Request of measurement
 	      bme280_get_sensor_data(BME280_ALL, &comp_data, &dev);
 
-	      // Kiírás a terminálra
-	      printf("Homerseklet: %.2f C | Paratartalom: %.2f %% | Nyomas: %.2f hPa\r\n",
+	      // Print data to serial terminal
+	      printf("Temperature: %.2f C | Humidity: %.2f %% | Pressure: %.2f hPa\r\n",
 	             comp_data.temperature,
 	             comp_data.humidity,
 	             comp_data.pressure / 100.0);
 
-	      HAL_Delay(1000); // 1 másodperces várakozás
+	      HAL_Delay(1000);
 
-	      // 1. Töröld a puffert
 	      ssd1306_Fill(Black);
 
-	      // 2. Készítsd elő a szövegeket (külön változókba vagy soronként)
 	      char buffer1[20];
 	      char buffer2[20];
 	      char buffer3[20];
@@ -179,18 +177,17 @@ int main(void)
 	      sprintf(buffer2, "Hum: %.2f %%", comp_data.humidity);
 	      sprintf(buffer3, "Pres: %.2f hPa", comp_data.pressure / 100.0);
 
-	      // 3. Írd ki őket különböző sorokba
 	      ssd1306_SetCursor(0, 0);  // 1. sor (y = 0)
 	      ssd1306_WriteString(buffer1, Font_7x10, White);
 
-	      ssd1306_SetCursor(0, 15); // 2. sor (y = 15, mert a Font_7x10 magassága 10-12 pixel)
+	      ssd1306_SetCursor(0, 15); // 2. sor (y = 15)
 	      ssd1306_WriteString(buffer2, Font_7x10, White);
 
 	      ssd1306_SetCursor(0, 30); // 3. sor (y = 30)
 	      ssd1306_WriteString(buffer3, Font_7x10, White);
 
-	      // 4. Frissíts!
 	      ssd1306_UpdateScreen();
+	      HAL_Delay(500);
 	          /* USER CODE END WHILE */
 	      /* USER CODE END WHILE */
     /* USER CODE BEGIN 3 */
@@ -358,10 +355,9 @@ PUTCHAR_PROTOTYPE
   return ch;
 }
 
-/* Bosch BME280 I2C Olvasó híd */
+/* Bosch BME280 I2C read interface */
 int8_t user_i2c_read(uint8_t reg_addr, uint8_t *reg_data, uint32_t len, void *intf_ptr)
 {
-    // Az intf_ptr hordozza az I2C periféria címét (pl. &hi2c1)
     HAL_StatusTypeDef status;
     uint8_t dev_addr = *(uint8_t*)intf_ptr;
 
@@ -374,7 +370,7 @@ int8_t user_i2c_read(uint8_t reg_addr, uint8_t *reg_data, uint32_t len, void *in
     }
 }
 
-/* Bosch BME280 I2C Író híd */
+/* Bosch BME280 I2C write interface */
 int8_t user_i2c_write(uint8_t reg_addr, const uint8_t *reg_data, uint32_t len, void *intf_ptr)
 {
     HAL_StatusTypeDef status;
@@ -389,11 +385,9 @@ int8_t user_i2c_write(uint8_t reg_addr, const uint8_t *reg_data, uint32_t len, v
     }
 }
 
-/* Bosch BME280 Késleltetés híd (milliszekundumban) */
+/* Bosch BME280 I2C delay interface */
 void user_delay_us(uint32_t period, void *intf_ptr)
 {
-    // A Bosch mikroszekundumban kéri, de a HAL_Delay milliszekundumos.
-    // Átváltjuk: 1 ms = 1000 us. Ha a periódus kisebb mint 1000, akkor is várunk legalább 1 ms-ot.
     uint32_t ms = period / 1000;
     if (ms == 0 && period > 0) {
         ms = 1;
